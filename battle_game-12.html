@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>블루 vs 레드 배틀</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a0f;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100vh; font-family:'Black Han Sans',sans-serif;
+  overflow:hidden; user-select:none;
+}
+#hud { display:flex; align-items:center; gap:20px; margin-bottom:10px; width:800px; }
+.hp-wrap { flex:1; }
+.hp-label { font-size:13px; margin-bottom:4px; letter-spacing:2px; }
+.hp-bar-bg { height:18px; background:#1a1a2e; border-radius:9px; overflow:hidden; border:1px solid rgba(255,255,255,0.1); }
+.hp-bar { height:100%; border-radius:9px; transition:width 0.15s; }
+#blue-hp-label { color:#4fc3f7; }
+#red-hp-label  { color:#ef5350; text-align:right; }
+#blue-bar { background:linear-gradient(90deg,#0288d1,#4fc3f7); }
+#red-bar  { background:linear-gradient(90deg,#ef5350,#ff8a80); }
+#red-hp-wrap { direction:rtl; }
+.pts-label { font-size:11px; margin-top:2px; letter-spacing:1px; }
+#blue-pts-label { color:#4fc3f7; }
+#red-pts-label  { color:#ef5350; text-align:right; }
+#timer-box { text-align:center; min-width:80px; }
+#timer { font-size:32px; color:#fff; text-shadow:0 0 10px rgba(255,255,255,0.4); }
+#round-label { font-size:11px; color:#888; letter-spacing:2px; }
+#game-canvas { border:1px solid rgba(255,255,255,0.08); border-radius:4px; display:block; }
+#controls-info {
+  display:flex; justify-content:space-between; align-items:center;
+  width:800px; margin-top:10px;
+  font-family:'Noto Sans KR',sans-serif; font-size:11px; color:#777;
+}
+#controls-info b { color:#999; }
+#to-title-btn {
+  font-family:'Black Han Sans',sans-serif; font-size:12px; letter-spacing:1px;
+  padding:5px 14px; border:1px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.06); color:#aaa; border-radius:4px; cursor:pointer;
+}
+#to-title-btn:hover { background:rgba(255,255,255,0.15); color:#fff; }
+
+/* 타이틀 오버레이 */
+#overlay {
+  position:fixed; inset:0; z-index:100;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  overflow:hidden;
+}
+#overlay-bg { position:absolute; inset:0; display:flex; }
+#overlay-blue { flex:1; background:#0d3b6e; }
+#overlay-red  { flex:1; background:#7f0000; }
+#overlay-divider {
+  position:absolute; top:0; bottom:0; left:50%;
+  transform:translateX(-50%); width:4px; background:rgba(255,255,255,0.15);
+}
+#overlay-content {
+  position:relative; z-index:2;
+  display:flex; flex-direction:column; align-items:center;
+}
+#team-labels { display:flex; gap:180px; margin-bottom:16px; }
+.team-label { font-size:36px; letter-spacing:6px; text-shadow:0 0 30px currentColor; }
+.team-label.blue { color:#4fc3f7; }
+.team-label.red  { color:#ef5350; }
+#vs-text {
+  font-size:100px; color:#fff; letter-spacing:8px; line-height:1;
+  text-shadow:0 0 40px rgba(255,255,255,0.7);
+  animation:vsBob 1.2s ease-in-out infinite;
+}
+@keyframes vsBob { 0%{transform:translateY(-20px)} 50%{transform:translateY(20px)} 100%{transform:translateY(-20px)} }
+#overlay-result { font-size:52px; letter-spacing:6px; text-shadow:0 0 40px currentColor; display:none; }
+#overlay-sub {
+  color:rgba(255,255,255,0.5); font-family:'Noto Sans KR',sans-serif;
+  font-size:14px; margin-top:24px; margin-bottom:28px; letter-spacing:1px; text-align:center;
+}
+#start-btn {
+  padding:16px 56px; font-size:20px; font-family:'Black Han Sans',sans-serif;
+  letter-spacing:4px; border:2px solid rgba(255,255,255,0.6);
+  background:rgba(255,255,255,0.08); color:#fff; cursor:pointer; border-radius:4px;
+}
+#start-btn:hover { background:rgba(255,255,255,0.2); }
+#shop-title-btn {
+  margin-top:10px; padding:10px 36px; font-size:15px;
+  font-family:'Black Han Sans',sans-serif; letter-spacing:3px;
+  border:1px solid rgba(255,215,0,0.5); background:rgba(255,215,0,0.1);
+  color:#ffd700; cursor:pointer; border-radius:4px;
+}
+#shop-title-btn:hover { background:rgba(255,215,0,0.25); }
+
+/* 튜토리얼 */
+#tutorial { margin-top:20px; width:680px; }
+.tut-cols { display:flex; gap:10px; }
+.tut-card { flex:1; border-radius:8px; padding:12px 14px; font-family:'Noto Sans KR',sans-serif; }
+.blue-card   { background:rgba(13,59,110,0.7); border:1px solid rgba(79,195,247,0.3); }
+.center-card { background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.15); }
+.red-card    { background:rgba(127,0,0,0.7); border:1px solid rgba(239,83,80,0.3); }
+.tut-title { font-size:13px; font-weight:700; margin-bottom:8px; letter-spacing:1px; }
+.blue-txt { color:#4fc3f7; } .red-txt { color:#ef5350; } .white-txt { color:#fff; }
+.tut-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; font-size:12px; color:rgba(255,255,255,0.75); }
+.key { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); border-radius:4px; padding:2px 7px; font-size:11px; color:#fff; font-family:monospace; min-width:32px; text-align:center; }
+.tut-rule { font-size:12px; color:rgba(255,255,255,0.75); margin-bottom:5px; line-height:1.5; }
+
+/* 상점 오버레이 */
+#shop-overlay {
+  position:fixed; inset:0; z-index:300;
+  background:rgba(0,0,0,0.85);
+  display:none; align-items:center; justify-content:center;
+}
+#shop-box {
+  background:#12121f; border:1px solid rgba(255,215,0,0.25);
+  border-radius:14px; padding:24px; width:700px;
+  font-family:'Noto Sans KR',sans-serif; max-height:90vh; overflow-y:auto;
+}
+#shop-header {
+  display:flex; justify-content:space-between; align-items:center;
+  font-family:'Black Han Sans',sans-serif; font-size:20px; color:#ffd700; margin-bottom:18px;
+}
+#shop-header button {
+  font-size:13px; padding:6px 14px;
+  border:1px solid rgba(255,255,255,0.2);
+  background:transparent; color:#aaa; cursor:pointer; border-radius:4px;
+}
+#shop-cols { display:flex; }
+.shop-team-col { flex:1; padding:0 14px; }
+.shop-divider { width:1px; background:rgba(255,255,255,0.1); margin:0 4px; }
+.shop-team-title { font-family:'Black Han Sans',sans-serif; font-size:16px; letter-spacing:2px; margin-bottom:6px; }
+.shop-team-equipped { font-size:12px; color:#888; margin-bottom:12px; }
+#blue-equipped { color:#4fc3f7; font-weight:700; }
+#red-equipped  { color:#ef5350; font-weight:700; }
+.shop-team-items { display:flex; flex-direction:column; gap:7px; }
+.shop-item { border-radius:8px; padding:9px 12px; display:flex; flex-direction:column; gap:4px; }
+.blue-item { background:rgba(13,59,110,0.5); border:1px solid rgba(79,195,247,0.25); }
+.red-item  { background:rgba(127,0,0,0.5);   border:1px solid rgba(239,83,80,0.25); }
+.shop-item-row { display:flex; align-items:center; gap:8px; }
+.shop-item-name  { font-size:14px; font-weight:700; color:#fff; flex:1; }
+.shop-item-price { font-size:12px; color:#ffd700; }
+.shop-item-desc  { font-size:11px; color:#aaa; }
+.buy-btn {
+  padding:5px 12px; font-size:12px; border-radius:4px; cursor:pointer;
+  border:1px solid; font-family:'Black Han Sans',sans-serif; letter-spacing:1px;
+  width:100%; margin-top:4px;
+}
+.buy-blue { border-color:#4fc3f7; color:#4fc3f7; background:rgba(79,195,247,0.1); }
+.buy-blue:hover:not(:disabled) { background:rgba(79,195,247,0.25); }
+.buy-red  { border-color:#ef5350; color:#ef5350; background:rgba(239,83,80,0.1); }
+.buy-red:hover:not(:disabled)  { background:rgba(239,83,80,0.25); }
+#shop-tabs { display:flex; gap:8px; margin-bottom:16px; }
+.shop-tab {
+  flex:1; padding:8px; font-family:'Black Han Sans',sans-serif; font-size:14px;
+  letter-spacing:2px; border:1px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.05); color:#888; cursor:pointer; border-radius:6px;
+}
+.shop-tab.active { background:rgba(255,215,0,0.15); border-color:rgba(255,215,0,0.5); color:#ffd700; }
+.shop-tab:hover:not(.active) { background:rgba(255,255,255,0.1); color:#ccc; }
+.buy-btn:disabled { opacity:0.35; cursor:not-allowed; }
+#mode-select { margin-top:14px; width:680px; }
+#mode-label { font-size:12px; color:rgba(255,255,255,0.4); letter-spacing:3px; text-align:center; margin-bottom:8px; }
+#mode-btns { display:flex; gap:8px; }
+.mode-btn {
+  flex:1; padding:10px 6px; border-radius:8px; cursor:pointer;
+  border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05);
+  color:#aaa; font-family:'Black Han Sans',sans-serif; font-size:13px;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  letter-spacing:1px; transition:all 0.15s;
+}
+.mode-btn span { font-family:'Noto Sans KR',sans-serif; font-size:10px; color:#666; font-weight:400; letter-spacing:0; }
+.mode-btn:hover { background:rgba(255,255,255,0.1); color:#fff; border-color:rgba(255,255,255,0.3); }
+.mode-btn.active { background:rgba(255,215,0,0.12); border-color:rgba(255,215,0,0.6); color:#ffd700; }
+.mode-btn.active span { color:#b8860b; }
+#mode-badge {
+  position:absolute; top:10px; left:50%; transform:translateX(-50%);
+  font-family:'Black Han Sans',sans-serif; font-size:13px; letter-spacing:2px;
+  padding:4px 16px; border-radius:20px; background:rgba(0,0,0,0.5);
+  border:1px solid rgba(255,255,255,0.2); color:#fff; pointer-events:none;
+}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="hp-wrap">
+    <div class="hp-label" id="blue-hp-label">BLUE ♥ 150</div>
+    <div class="hp-bar-bg"><div class="hp-bar" id="blue-bar" style="width:100%"></div></div>
+    <div class="pts-label" id="blue-pts-label">💰 0P</div>
+  </div>
+  <div id="timer-box">
+    <div id="timer">120</div>
+    <div id="round-label">TIME</div>
+  </div>
+  <div class="hp-wrap" id="red-hp-wrap">
+    <div class="hp-label" id="red-hp-label">RED ♥ 150</div>
+    <div class="hp-bar-bg"><div class="hp-bar" id="red-bar" style="width:100%"></div></div>
+    <div class="pts-label" id="red-pts-label">💰 0P</div>
+  </div>
+</div>
+
+<canvas id="game-canvas" width="800" height="420"></canvas>
+
+<div id="controls-info">
+  <span><b>블루팀:</b> ←→ 이동 | ↑ 점프 | ↓ 공격 | . 아이템</span>
+  <button id="to-title-btn">⏮ 타이틀로</button>
+  <span><b>레드팀:</b> A/D 이동 | Space 점프 | S 공격 | E 아이템</span>
+</div>
+
+<!-- 타이틀 오버레이 -->
+<div id="overlay">
+  <div id="overlay-bg"><div id="overlay-blue"></div><div id="overlay-red"></div></div>
+  <div id="overlay-divider"></div>
+  <div id="overlay-content">
+    <div id="team-labels">
+      <span class="team-label blue">BLUE</span>
+      <span class="team-label red">RED</span>
+    </div>
+    <div id="vs-text">VS</div>
+    <div id="overlay-result"></div>
+    <div id="overlay-sub">두 명이 같은 키보드로 대결하는 2인용 게임</div>
+    <button id="start-btn">게임 시작</button>
+    <button id="shop-title-btn">🛒 상점</button>
+    <div id="mode-select">
+      <div id="mode-label">게임 모드 선택</div>
+      <div id="mode-btns">
+        <button class="mode-btn active" data-mode="normal">⚔️ 일반전<span>5분 제한</span></button>
+        <button class="mode-btn" data-mode="survival">🌪️ 서바이벌<span>벽이 좁아짐</span></button>
+        <button class="mode-btn" data-mode="sudden">💀 돌발전<span>시간없이 HP0까지</span></button>
+        <button class="mode-btn" data-mode="item">🎁 아이템전<span>아이템으로 점수올리기</span></button>
+      </div>
+    </div>
+    <div id="tutorial">
+      <div class="tut-cols">
+        <div class="tut-card blue-card">
+          <div class="tut-title blue-txt">🔵 블루팀 조작</div>
+          <div class="tut-row"><span class="key">←→</span><span>이동</span></div>
+          <div class="tut-row"><span class="key">↑</span><span>점프</span></div>
+          <div class="tut-row"><span class="key">↓</span><span>공격</span></div>
+          <div class="tut-row"><span class="key">.</span><span>아이템 줍기</span></div>
+        </div>
+        <div class="tut-card center-card">
+          <div class="tut-title white-txt">📜 규칙</div>
+          <div class="tut-rule">상대 HP를 0으로 만들면 승리</div>
+          <div class="tut-rule">시간 종료 시 HP 높은 팀 승리</div>
+          <div class="tut-rule">제한시간 5분 | 이기면 +100P</div>
+          <div class="tut-title white-txt" style="margin-top:10px">🧪 아이템</div>
+          <div class="tut-rule">❤️ 빨간 물약 — HP +30 회복</div>
+          <div class="tut-rule">⭐ 별 — 공격력 강화</div>
+        </div>
+        <div class="tut-card red-card">
+          <div class="tut-title red-txt">🔴 레드팀 조작</div>
+          <div class="tut-row"><span class="key">A D</span><span>이동</span></div>
+          <div class="tut-row"><span class="key">Space</span><span>점프</span></div>
+          <div class="tut-row"><span class="key">S</span><span>공격</span></div>
+          <div class="tut-row"><span class="key">E</span><span>아이템 줍기</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 상점 오버레이 (z-index 300으로 타이틀 위) -->
+<div id="shop-overlay">
+  <div id="shop-box">
+    <div id="shop-header">
+      <span id="shop-title-text">🛒 무기 상점</span>
+      <button id="shop-close-btn">✕ 닫기</button>
+    </div>
+    <div id="shop-tabs">
+      <button class="shop-tab active" id="tab-weapon" onclick="switchTab('weapon')">⚔️ 무기</button>
+      <button class="shop-tab" id="tab-skin" onclick="switchTab('skin')">🎨 스킨샵</button>
+    </div>
+    <div id="shop-cols">
+      <div class="shop-team-col">
+        <div class="shop-team-title blue-txt">🔵 블루팀 &nbsp;<span id="shop-blue-pts">0</span>P</div>
+        <div class="shop-team-equipped">장착 중: <span id="blue-equipped">없음</span></div>
+        <div class="shop-team-items" id="shop-blue-items"></div>
+      </div>
+      <div class="shop-divider"></div>
+      <div class="shop-team-col">
+        <div class="shop-team-title red-txt">🔴 레드팀 &nbsp;<span id="shop-red-pts">0</span>P</div>
+        <div class="shop-team-equipped">장착 중: <span id="red-equipped">없음</span></div>
+        <div class="shop-team-items" id="shop-red-items"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const GROUND = H - 60;
+const GRAVITY = 0.6, JUMP_F = -14, SPEED = 4;
+const ATK_DMG = 10, POTION_HP = 30;
+const ATTACK_RANGE = 70, ATTACK_DURATION = 20, ATTACK_COOLDOWN = 40;
+
+let gameRunning = false, timeLeft = 300, timerInterval = null;
+let items = [], particles = [], frameId = null, itemSpawnTimer = 0;
+let bluePoints = 0, redPoints = 0;
+let blueWeapon = null, redWeapon = null;
+let blue, red;
+const keys = {};
+let currentMode = 'normal';
+let wallLeft = 0, wallRight = W;
+let itemScoreBlue = 0, itemScoreRed = 0;
+
+const WEAPONS = [
+  { id:'sword',  name:'⚔️ 검',    price:100, dmgMult:1.8, rangeMult:1.0, desc:'공격력 +80%' },
+  { id:'bow',    name:'🏹 활',    price:150, dmgMult:1.3, rangeMult:2.2, desc:'사거리 +120%' },
+  { id:'shield', name:'🛡️ 방패',  price:120, dmgMult:0.8, rangeMult:0.8, desc:'받는 피해 -40%' },
+  { id:'spear',  name:'🗡️ 창',    price:180, dmgMult:2.0, rangeMult:1.6, desc:'공격력 +100%, 사거리 +60%' },
+  { id:'hammer', name:'🔨 망치',  price:200, dmgMult:2.5, rangeMult:0.7, desc:'공격력 +150% (짧은 사거리)' },
+];
+
+const SKINS = [
+  { id:'default', name:'기본', price:0,   desc:'기본 캐릭터', emoji:'🧍' },
+  { id:'robot',   name:'로봇', price:150, desc:'강철 로봇 전사', emoji:'🤖' },
+  { id:'ninja',   name:'닌자', price:200, desc:'어둠의 닌자', emoji:'🥷' },
+  { id:'wizard',  name:'마법사', price:250, desc:'고대 마법사', emoji:'🧙' },
+  { id:'knight',  name:'기사', price:300, desc:'황금 기사', emoji:'⚔️🛡️' },
+  { id:'alien',   name:'외계인', price:350, desc:'우주에서 온 전사', emoji:'👽' },
+];
+
+let blueSkin = SKINS[0], redSkin = SKINS[0];
+let blueOwnedSkins = new Set(['default']), redOwnedSkins = new Set(['default']);
+
+document.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefault(); });
+document.addEventListener('keyup',   e => { keys[e.code] = false; });
+
+function makePlayer(x, color, isBlue) {
+  return {
+    x, y: GROUND, w: 36, h: 52, vx: 0, vy: 0,
+    hp: 150, maxHp: 150, onGround: false, color, isBlue,
+    facing: isBlue ? -1 : 1,
+    attacking: 0, attackCooldown: 0, hitFlash: 0,
+    weapon: isBlue ? blueWeapon : redWeapon,
+  };
+}
+
+function handleInput(p, upKey, leftKey, rightKey, atkKey, itemKey) {
+  if (keys[leftKey])       { p.vx = -SPEED; p.facing = -1; }
+  else if (keys[rightKey]) { p.vx =  SPEED; p.facing =  1; }
+  else p.vx *= 0.7;
+  if (keys[upKey] && p.onGround) { p.vy = JUMP_F; p.onGround = false; }
+  if (keys[atkKey] && p.attackCooldown === 0) {
+    p.attacking = ATTACK_DURATION; p.attackCooldown = ATTACK_COOLDOWN; keys[atkKey] = false;
+  }
+  if (keys[itemKey]) { pickItem(p); keys[itemKey] = false; }
+}
+
+function updatePlayer(p) {
+  p.vy += GRAVITY; p.x += p.vx; p.y += p.vy;
+  if (p.y >= GROUND) { p.y = GROUND; p.vy = 0; p.onGround = true; } else p.onGround = false;
+  p.x = Math.max(0, Math.min(W - p.w, p.x));
+  if (p.attacking > 0) p.attacking--;
+  if (p.attackCooldown > 0) p.attackCooldown--;
+  if (p.hitFlash > 0) p.hitFlash--;
+  items.forEach(it => it.anim = (it.anim || 0) + 0.05);
+}
+
+function pickItem(p) {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (Math.abs((p.x + p.w/2) - (it.x + 16)) < 60) {
+      if (it.type === 'potion') { p.hp = Math.min(p.maxHp, p.hp + POTION_HP); spawnParticle(p.x+p.w/2, p.y+p.h/2, '#a5d6a7', 12); }
+      else { spawnParticle(p.x+p.w/2, p.y+p.h/2, '#ffe082', 12); }
+      if (currentMode === 'item') {
+        if (p.isBlue) itemScoreBlue++; else itemScoreRed++;
+      }
+      items.splice(i, 1); break;
+    }
+  }
+}
+
+function checkAttack(attacker, defender) {
+  if (attacker.attacking > 0 && attacker.attacking === ATTACK_DURATION - 2) {
+    const w = attacker.weapon;
+    const dmg = ATK_DMG * (w ? w.dmgMult : 1);
+    const range = ATTACK_RANGE * (w ? w.rangeMult : 1);
+    const defMult = (defender.weapon && defender.weapon.id === 'shield') ? 0.6 : 1;
+    const ax = attacker.x + attacker.w/2 + attacker.facing * range * 0.5;
+    if (Math.abs(ax - (defender.x + defender.w/2)) < range * 0.8) {
+      defender.hp = Math.max(0, defender.hp - dmg * defMult);
+      defender.hitFlash = 15; defender.vx = attacker.facing * 3; defender.vy = -3;
+      spawnParticle(defender.x+defender.w/2, defender.y+defender.h/2, defender.color, 8);
+    }
+  }
+}
+
+function resolveCollision(a, b) {
+  if (a.x+a.w > b.x && a.x < b.x+b.w && a.y+a.h > b.y && a.y < b.y+b.h) {
+    const ov = Math.min(a.x+a.w-b.x, b.x+b.w-a.x)/2+1;
+    if (a.x < b.x) { a.x -= ov; b.x += ov; } else { a.x += ov; b.x -= ov; }
+    a.x = Math.max(0, Math.min(W-a.w, a.x));
+    b.x = Math.max(0, Math.min(W-b.w, b.x));
+  }
+}
+
+function spawnItem() {
+  if (items.length >= 2) return;
+  const t = ['potion','potion','power'][Math.floor(Math.random()*3)];
+  items.push({ x: 100+Math.random()*600, y: GROUND, type: t, anim: 0 });
+}
+
+function spawnParticle(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random()*Math.PI*2, s = 1+Math.random()*4;
+    particles.push({ x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s-2, life:30+Math.random()*20, maxLife:50, color, size:3+Math.random()*4 });
+  }
+}
+function updateParticles() {
+  for (let i = particles.length-1; i >= 0; i--) {
+    const p = particles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.2; p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawBackground() {
+  const sky = ctx.createLinearGradient(0,0,0,GROUND);
+  sky.addColorStop(0,'#4a90c8'); sky.addColorStop(0.6,'#87CEEB'); sky.addColorStop(1,'#c9e8f7');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,GROUND);
+
+  ctx.fillStyle='rgba(255,255,255,0.85)';
+  [[60,55,44],[130,42,30],[250,50,36],[420,38,26],[570,52,34],[690,44,28],[760,58,40]].forEach(([x,y,r])=>{
+    [0,r*.55,6,-r*.5,8,r*.1,-r*.3].forEach((_,i,arr)=>{if(i%2===0&&i<6){ctx.beginPath();ctx.arc(x+(arr[i]||0),y+(arr[i+1]||0),i===0?r:r*(i===2?.72:.65),0,Math.PI*2);ctx.fill();}});
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x+r*.55,y+6,r*.72,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x-r*.5,y+8,r*.65,0,Math.PI*2);ctx.fill();
+  });
+
+  // 원거리 산
+  const fm = ctx.createLinearGradient(0,GROUND-200,0,GROUND);
+  fm.addColorStop(0,'#8eafd4'); fm.addColorStop(1,'#7a9fc4');
+  ctx.fillStyle=fm; ctx.beginPath(); ctx.moveTo(0,GROUND);
+  const fpts=[[0,110],[60,155],[130,105],[200,175],[270,120],[340,190],[420,130],[490,200],[560,145],[630,180],[700,120],[770,165],[800,130]];
+  fpts.forEach(([x,h])=>ctx.lineTo(x,GROUND-h));
+  ctx.lineTo(800,GROUND); ctx.closePath(); ctx.fill();
+
+  // 눈
+  ctx.fillStyle='rgba(255,255,255,0.75)';
+  [[200,175,22],[340,190,26],[490,200,28],[630,180,22],[770,165,20]].forEach(([x,h,s])=>{
+    ctx.beginPath();ctx.moveTo(x,GROUND-h);ctx.lineTo(x-s,GROUND-h+s*1.1);ctx.lineTo(x+s,GROUND-h+s*1.1);ctx.closePath();ctx.fill();
+  });
+
+  // 중거리 산
+  const mm = ctx.createLinearGradient(0,GROUND-160,0,GROUND);
+  mm.addColorStop(0,'#5a7a4a'); mm.addColorStop(0.5,'#4a6a3a'); mm.addColorStop(1,'#3a5a2a');
+  ctx.fillStyle=mm; ctx.beginPath(); ctx.moveTo(0,GROUND); ctx.lineTo(0,GROUND-80);
+  ctx.bezierCurveTo(30,GROUND-110,70,GROUND-125,110,GROUND-100);
+  ctx.bezierCurveTo(140,GROUND-140,180,GROUND-155,220,GROUND-125);
+  ctx.bezierCurveTo(255,GROUND-90,285,GROUND-130,320,GROUND-145);
+  ctx.bezierCurveTo(355,GROUND-115,390,GROUND-95,420,GROUND-120);
+  ctx.bezierCurveTo(455,GROUND-145,490,GROUND-155,530,GROUND-130);
+  ctx.bezierCurveTo(560,GROUND-105,595,GROUND-135,630,GROUND-150);
+  ctx.bezierCurveTo(660,GROUND-120,700,GROUND-100,730,GROUND-115);
+  ctx.bezierCurveTo(755,GROUND-130,780,GROUND-110,800,GROUND-90);
+  ctx.lineTo(800,GROUND); ctx.closePath(); ctx.fill();
+
+  // 지면
+  const gg = ctx.createLinearGradient(0,GROUND,0,H);
+  gg.addColorStop(0,'#5db85d'); gg.addColorStop(0.12,'#4caf50'); gg.addColorStop(1,'#2e7d32');
+  ctx.fillStyle=gg; ctx.fillRect(0,GROUND,W,H-GROUND);
+  ctx.fillStyle='#66bb6a';
+  for (let gx=5; gx<W; gx+=18) { const gh=5+Math.sin(gx*.37)*3; ctx.beginPath(); ctx.moveTo(gx,GROUND); ctx.quadraticCurveTo(gx+3,GROUND-gh,gx+7,GROUND); ctx.fill(); }
+  [[160,GROUND-14],[290,GROUND-18],[430,GROUND-13],[540,GROUND-16],[730,GROUND-14]].forEach(([fx,fy])=>{
+    ctx.fillStyle='#ffeb3b'; ctx.beginPath(); ctx.arc(fx,fy,4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff';
+    for(let p=0;p<6;p++){const a=(p/6)*Math.PI*2;ctx.beginPath();ctx.ellipse(fx+Math.cos(a)*7,fy+Math.sin(a)*7,3.5,2,a,0,Math.PI*2);ctx.fill();}
+  });
+}
+
+function drawPlayer(p) {
+  const cx=p.x+p.w/2;
+  const isHit=p.hitFlash>0&&Math.floor(p.hitFlash/3)%2===0;
+  ctx.save(); ctx.globalAlpha=isHit?0.4:1;
+  const skin=p.isBlue?blueSkin:redSkin;
+  const ac=p.isBlue?'#4fc3f7':'#ef5350', dc=p.isBlue?'#0d47a1':'#7f0000', bc=p.isBlue?'#1565c0':'#b71c1c';
+  const by=p.y+26;
+
+  if(skin.id==='robot'){
+    // 로봇: 네모 머리, 안테나, 금속 몸통
+    ctx.fillStyle=p.isBlue?'#546e7a':'#b0bec5';
+    ctx.beginPath();ctx.roundRect(cx-12,p.y+2,24,22,3);ctx.fill();
+    ctx.fillStyle='#29b6f6'; ctx.beginPath();ctx.arc(cx-5,p.y+11,4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ef5350'; ctx.beginPath();ctx.arc(cx+5,p.y+11,4,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=p.isBlue?'#90caf9':'#ffcdd2'; ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(cx,p.y+2);ctx.lineTo(cx,p.y-6);ctx.stroke();
+    ctx.fillStyle=p.isBlue?'#90caf9':'#ffcdd2'; ctx.beginPath();ctx.arc(cx,p.y-7,3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#455a64';
+    ctx.beginPath();ctx.roundRect(p.x+3,by,p.w-6,20,2);ctx.fill();
+    ctx.strokeStyle='#78909c'; ctx.lineWidth=1;
+    ctx.strokeRect(p.x+7,by+4,8,6); ctx.strokeRect(p.x+p.w-15,by+4,8,6);
+    ctx.fillStyle='#546e7a';
+    ctx.beginPath();ctx.roundRect(p.x+4,p.y+46,10,18,2);ctx.fill();
+    ctx.beginPath();ctx.roundRect(p.x+p.w-14,p.y+46,10,18,2);ctx.fill();
+
+  } else if(skin.id==='ninja'){
+    // 닌자: 어두운 복면, 날렵한 몸통
+    ctx.fillStyle='#212121'; ctx.beginPath();ctx.arc(cx,p.y+14,13,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=p.isBlue?'#1a237e':'#880e4f';
+    ctx.beginPath();ctx.arc(cx,p.y+8,13,Math.PI,0);ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath();ctx.arc(cx+p.facing*3,p.y+14,3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#212121'; ctx.beginPath();ctx.roundRect(p.x+4,by,p.w-8,22,4);ctx.fill();
+    ctx.fillStyle=p.isBlue?'#3949ab':'#ad1457';
+    ctx.fillRect(cx-1,by+2,2,18); ctx.fillRect(p.x+6,by+5,8,2); ctx.fillRect(p.x+p.w-14,by+5,8,2);
+    ctx.fillStyle='#1a1a1a';
+    ctx.beginPath();ctx.roundRect(p.x+4,p.y+47,12,16,3);ctx.fill();
+    ctx.beginPath();ctx.roundRect(p.x+p.w-16,p.y+47,12,16,3);ctx.fill();
+
+  } else if(skin.id==='wizard'){
+    // 마법사: 뾰족 모자, 별 장식
+    ctx.fillStyle=p.isBlue?'#4527a0':'#6a1b9a';
+    ctx.beginPath();ctx.moveTo(cx,p.y-18);ctx.lineTo(cx-12,p.y+8);ctx.lineTo(cx+12,p.y+8);ctx.closePath();ctx.fill();
+    ctx.fillStyle=p.isBlue?'#7e57c2':'#ab47bc'; ctx.beginPath();ctx.arc(cx,p.y+14,13,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ffe082'; ctx.font='10px Arial'; ctx.fillText('★',cx-4,p.y+18);
+    ctx.fillStyle=p.isBlue?'#512da8':'#7b1fa2';
+    ctx.beginPath();ctx.roundRect(p.x+4,by,p.w-8,22,4);ctx.fill();
+    ctx.fillStyle='#ce93d8'; ctx.fillRect(cx-1,by+2,2,18);
+    ctx.fillStyle=p.isBlue?'#4527a0':'#6a1b9a';
+    ctx.beginPath();ctx.roundRect(p.x+4,p.y+47,12,16,3);ctx.fill();
+    ctx.beginPath();ctx.roundRect(p.x+p.w-16,p.y+47,12,16,3);ctx.fill();
+
+  } else if(skin.id==='knight'){
+    // 기사: 투구, 황금 갑옷
+    ctx.fillStyle='#78909c'; ctx.beginPath();ctx.arc(cx,p.y+14,14,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#b0bec5'; ctx.beginPath();ctx.arc(cx,p.y+12,11,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ffd54f'; ctx.fillRect(cx-8,p.y+8,16,3);
+    ctx.fillStyle='#455a64'; ctx.fillRect(cx-4,p.y+10,8,6);
+    ctx.fillStyle='#ffd54f';
+    ctx.beginPath();ctx.roundRect(p.x+3,by,p.w-6,22,3);ctx.fill();
+    ctx.fillStyle='#ffb300'; ctx.fillRect(cx-1,by+2,2,18); ctx.fillRect(p.x+5,by+5,9,2); ctx.fillRect(p.x+p.w-14,by+5,9,2);
+    ctx.fillStyle='#78909c';
+    ctx.beginPath();ctx.roundRect(p.x+3,p.y+47,13,17,3);ctx.fill();
+    ctx.beginPath();ctx.roundRect(p.x+p.w-16,p.y+47,13,17,3);ctx.fill();
+
+  } else if(skin.id==='alien'){
+    // 외계인: 큰 눈, 초록 피부
+    ctx.fillStyle='#66bb6a'; ctx.beginPath();ctx.arc(cx,p.y+12,15,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1b5e20'; ctx.beginPath();ctx.arc(cx,p.y+10,10,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.ellipse(cx-6,p.y+10,6,7,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(cx+6,p.y+10,6,7,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#000';
+    ctx.beginPath();ctx.ellipse(cx-5+p.facing,p.y+10,3,4,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(cx+5+p.facing,p.y+10,3,4,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#388e3c';
+    ctx.beginPath();ctx.roundRect(p.x+4,by,p.w-8,22,4);ctx.fill();
+    ctx.fillStyle='#66bb6a'; ctx.fillRect(cx-1,by+2,2,18);
+    ctx.fillStyle='#2e7d32';
+    ctx.beginPath();ctx.roundRect(p.x+4,p.y+47,12,16,3);ctx.fill();
+    ctx.beginPath();ctx.roundRect(p.x+p.w-16,p.y+47,12,16,3);ctx.fill();
+
+  } else {
+    // 기본
+    ctx.fillStyle=ac; ctx.beginPath(); ctx.arc(cx,p.y+14,13,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=dc; ctx.beginPath(); ctx.arc(cx,p.y+12,9,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=p.isBlue?'#e3f2fd':'#fce4ec'; ctx.beginPath(); ctx.arc(cx+p.facing*4,p.y+11,3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=bc; ctx.beginPath(); ctx.roundRect(p.x+4,by,p.w-8,22,4); ctx.fill();
+    ctx.fillStyle=ac; ctx.fillRect(cx-1,by+2,2,18); ctx.fillRect(p.x+6,by+4,8,2); ctx.fillRect(p.x+p.w-14,by+4,8,2);
+    ctx.fillStyle=dc;
+    ctx.beginPath();ctx.roundRect(p.x+4,p.y+47,12,16,3);ctx.fill();
+    ctx.beginPath();ctx.roundRect(p.x+p.w-16,p.y+47,12,16,3);ctx.fill();
+  }
+
+  // 무기 이펙트 (공통)
+  if (p.attacking>0) {
+    const w=p.weapon, armLen=30+(ATTACK_DURATION-p.attacking)*1.5;
+    const range=ATTACK_RANGE*(w?w.rangeMult:1), wc=w?w.color:ac;
+    ctx.strokeStyle=wc; ctx.lineWidth=5; ctx.lineCap='round'; ctx.shadowColor=wc; ctx.shadowBlur=10;
+    ctx.beginPath(); ctx.moveTo(cx+p.facing*8,by+6); ctx.lineTo(cx+p.facing*Math.min(armLen,range),by+6); ctx.stroke();
+    ctx.shadowBlur=0; ctx.fillStyle=wc; ctx.beginPath(); ctx.arc(cx+p.facing*Math.min(armLen,range),by+6,8,0,Math.PI*2); ctx.fill();
+  }
+  // 무기/스킨 라벨
+  const label=(skin.id!=='default'?skin.emoji+' ':'')+(p.weapon?p.weapon.name.split(' ')[0]:'');
+  if(label){ ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='11px sans-serif'; ctx.fillText(label,p.x,p.y-4); }
+  ctx.restore();
+}
+
+function drawItem(it) {
+  const by=Math.sin(it.anim)*5, ix=it.x, iy=it.y+by;
+  if (it.type==='potion') {
+    ctx.fillStyle='#e91e63'; ctx.beginPath(); ctx.arc(ix+16,iy-16,12,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='bold 12px Arial'; ctx.fillText('♥',ix+10,iy-10);
+    ctx.fillStyle='#9c27b0'; ctx.fillRect(ix+13,iy-28,6,8);
+  } else {
+    ctx.fillStyle='#ffd600'; ctx.beginPath();
+    for(let i=0;i<5;i++){const a=(i*4*Math.PI/5)-Math.PI/2,r=i%2===0?14:6;i===0?ctx.moveTo(ix+16+r*Math.cos(a),iy-16+r*Math.sin(a)):ctx.lineTo(ix+16+r*Math.cos(a),iy-16+r*Math.sin(a));}
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+function drawParticles() {
+  particles.forEach(p=>{ctx.globalAlpha=p.life/p.maxLife;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size*(p.life/p.maxLife),0,Math.PI*2);ctx.fill();});
+  ctx.globalAlpha=1;
+}
+
+function updateHUD() {
+  document.getElementById('blue-bar').style.width=(blue.hp/blue.maxHp*100)+'%';
+  document.getElementById('red-bar').style.width=(red.hp/red.maxHp*100)+'%';
+  document.getElementById('blue-hp-label').textContent=`BLUE ♥ ${Math.ceil(blue.hp)}`;
+  document.getElementById('red-hp-label').textContent=`RED ♥ ${Math.ceil(red.hp)}`;
+  document.getElementById('blue-pts-label').textContent=`💰 ${bluePoints}P`;
+  document.getElementById('red-pts-label').textContent=`💰 ${redPoints}P`;
+}
+
+function gameLoop() {
+  if (!gameRunning) return;
+  handleInput(blue,'ArrowUp','ArrowLeft','ArrowRight','ArrowDown','Period');
+  handleInput(red, 'Space',  'KeyA',     'KeyD',      'KeyS',    'KeyE');
+  updatePlayer(blue); updatePlayer(red);
+  checkAttack(blue,red); checkAttack(red,blue);
+  resolveCollision(blue,red);
+  updateParticles();
+
+  // 서바이벌: 벽 좁아지기
+  if (currentMode === 'survival') {
+    wallLeft  += 0.15;
+    wallRight -= 0.15;
+    if (blue.x < wallLeft)  { blue.x = wallLeft;  blue.vx = 2; blue.hp -= 0.3; }
+    if (blue.x + blue.w > wallRight) { blue.x = wallRight - blue.w; blue.vx = -2; blue.hp -= 0.3; }
+    if (red.x  < wallLeft)  { red.x  = wallLeft;  red.vx  = 2; red.hp  -= 0.3; }
+    if (red.x  + red.w  > wallRight) { red.x  = wallRight - red.w;  red.vx  = -2; red.hp  -= 0.3; }
+    blue.hp = Math.max(0, blue.hp);
+    red.hp  = Math.max(0, red.hp);
+  }
+
+  itemSpawnTimer++;
+  const spawnRate = currentMode === 'item' ? 60 : 180;
+  if (itemSpawnTimer > spawnRate) { spawnItem(); itemSpawnTimer = 0; }
+
+  drawBackground();
+
+  // 서바이벌 벽 그리기
+  if (currentMode === 'survival') {
+    ctx.fillStyle = 'rgba(255,50,50,0.35)';
+    ctx.fillRect(0, 0, wallLeft, H);
+    ctx.fillRect(wallRight, 0, W - wallRight, H);
+    ctx.fillStyle = '#ff4444';
+    ctx.fillRect(wallLeft - 3, 0, 6, H);
+    ctx.fillRect(wallRight - 3, 0, 6, H);
+    // 경고: 벽이 가까워지면 깜빡임
+    if (wallRight - wallLeft < 300) {
+      ctx.fillStyle = `rgba(255,0,0,${0.1 + Math.sin(Date.now()*0.01)*0.08})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  // 아이템전 점수 표시
+  if (currentMode === 'item') {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(W/2 - 80, 10, 160, 36);
+    ctx.fillStyle = '#4fc3f7'; ctx.font = 'bold 18px Black Han Sans';
+    ctx.fillText(`🔵 ${itemScoreBlue}`, W/2 - 70, 34);
+    ctx.fillStyle = '#ef5350';
+    ctx.fillText(`${itemScoreRed} 🔴`, W/2 + 10, 34);
+  }
+
+  items.forEach(drawItem);
+  drawPlayer(blue); drawPlayer(red);
+  drawParticles();
+  updateHUD();
+
+  if (blue.hp<=0||red.hp<=0){endGame(blue.hp<=0?'RED':'BLUE');return;}
+
+  // 아이템전: 시간 종료 시 점수로 승패
+  if (currentMode === 'item' && timeLeft <= 0) return;
+
+  frameId=requestAnimationFrame(gameLoop);
+}
+
+// 음악
+let titleAC=null, titleNodes=[];
+function playTitleMusic() {
+  stopTitleMusic();
+  titleAC=new(window.AudioContext||window.webkitAudioContext)();
+  const master=titleAC.createGain();
+  master.gain.setValueAtTime(0,titleAC.currentTime);
+  master.gain.linearRampToValueAtTime(0.22,titleAC.currentTime+1.5);
+  master.connect(titleAC.destination);
+  const melody=[[392,0,.4],[392,.4,.4],[392,.8,.4],[523,1.2,.6],[659,1.8,.4],[659,2.4,.6],[784,3,.8],[784,3.8,.4],[784,4.2,.4],[880,4.6,.6],[784,5.2,.4],[784,6,1.2],[392,7.4,.4],[392,7.8,.4],[523,8.6,.6],[659,9.2,.4],[659,9.8,.6],[784,10.4,1.6]];
+  const bass=[[98,0,.3],[98,.8,.3],[110,2.4,.3],[98,3,.3],[98,3.8,.3],[110,5.2,.3],[98,6,.3],[98,6.8,.3],[110,8.4,.3],[98,9,.3],[98,9.8,.3],[98,10.4,.6]];
+  const chords=[[[196,247,294],0,1.2],[[196,247,294],1.2,1.2],[[220,277,330],2.4,1.2],[[196,247,294],3.6,1.2],[[175,220,262],4.8,1.2],[[196,247,294],6,1.2],[[196,247,294],7.2,1.2],[[220,277,330],8.4,1.2],[[196,247,294],9.6,1.2]];
+  [0,12,24].forEach(offset=>{
+    melody.forEach(([f,t,d])=>{ const o=titleAC.createOscillator(),g=titleAC.createGain(); o.type='square'; o.frequency.value=f; g.gain.setValueAtTime(0,titleAC.currentTime+offset+t); g.gain.linearRampToValueAtTime(0.15,titleAC.currentTime+offset+t+.02); g.gain.exponentialRampToValueAtTime(0.001,titleAC.currentTime+offset+t+d); o.connect(g);g.connect(master); o.start(titleAC.currentTime+offset+t); o.stop(titleAC.currentTime+offset+t+d+.05); titleNodes.push(o); });
+    bass.forEach(([f,t,d])=>{ const o=titleAC.createOscillator(),g=titleAC.createGain(); o.type='sawtooth'; o.frequency.value=f; g.gain.setValueAtTime(0,titleAC.currentTime+offset+t); g.gain.linearRampToValueAtTime(0.18,titleAC.currentTime+offset+t+.04); g.gain.exponentialRampToValueAtTime(0.001,titleAC.currentTime+offset+t+d); o.connect(g);g.connect(master); o.start(titleAC.currentTime+offset+t); o.stop(titleAC.currentTime+offset+t+d+.05); titleNodes.push(o); });
+    chords.forEach(([fs,t,d])=>fs.forEach(f=>{ const o=titleAC.createOscillator(),g=titleAC.createGain(); o.type='sine'; o.frequency.value=f; g.gain.setValueAtTime(0,titleAC.currentTime+offset+t); g.gain.linearRampToValueAtTime(0.07,titleAC.currentTime+offset+t+.1); g.gain.linearRampToValueAtTime(0,titleAC.currentTime+offset+t+d); o.connect(g);g.connect(master); o.start(titleAC.currentTime+offset+t); o.stop(titleAC.currentTime+offset+t+d+.05); titleNodes.push(o); }));
+  });
+}
+function stopTitleMusic() {
+  titleNodes.forEach(n=>{try{n.stop();}catch(e){}});
+  titleNodes=[];
+  if(titleAC){titleAC.close();titleAC=null;}
+}
+function playVictorySound() {
+  const ac=new(window.AudioContext||window.webkitAudioContext)();
+  [523,659,784,1047].forEach((f,i)=>{
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination); o.type='square'; o.frequency.value=f;
+    const t=i*.18; g.gain.setValueAtTime(0.18,ac.currentTime+t); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+t+.35);
+    o.start(ac.currentTime+t); o.stop(ac.currentTime+t+.4);
+  });
+}
+
+let gameAC=null, gameNodes=[];
+function playGameMusic() {
+  stopGameMusic();
+  gameAC=new(window.AudioContext||window.webkitAudioContext)();
+  const master=gameAC.createGain();
+  master.gain.setValueAtTime(0,gameAC.currentTime);
+  master.gain.linearRampToValueAtTime(0.18,gameAC.currentTime+0.8);
+  master.connect(gameAC.destination);
+
+  // 긴박한 전투 멜로디 (빠른 템포)
+  const melody=[
+    [330,0,.12],[392,.14,.12],[440,.28,.12],[494,.42,.18],
+    [440,.62,.12],[392,.76,.12],[349,.90,.18],
+    [330,1.1,.12],[370,1.24,.12],[440,1.38,.12],[494,1.52,.18],
+    [523,1.72,.12],[494,1.86,.12],[440,2.0,.18],
+    [392,2.2,.12],[440,2.34,.12],[494,2.48,.12],[523,2.62,.18],
+    [587,2.82,.12],[523,2.96,.12],[494,3.1,.18],
+    [440,3.3,.12],[494,3.44,.12],[523,3.58,.12],[587,3.72,.24],
+    [523,4.0,.12],[494,4.14,.12],[440,4.28,.12],[392,4.42,.24],
+    [349,4.68,.36]
+  ];
+  // 쿵짝 리듬 베이스
+  const bass=[
+    [110,0,.1],[110,.25,.08],[138,.5,.1],[110,.75,.08],
+    [110,1,.1],[110,1.25,.08],[138,1.5,.1],[110,1.75,.08],
+    [110,2,.1],[110,2.25,.08],[123,2.5,.1],[110,2.75,.08],
+    [110,3,.1],[110,3.25,.08],[138,3.5,.1],[110,3.75,.08],
+    [110,4,.1],[110,4.25,.08],[130,4.5,.1],[110,4.75,.08],
+  ];
+  // 타격감 있는 퍼커션 (노이즈 느낌)
+  const perc=[0,0.5,1,1.5,2,2.5,3,3.5,4,4.5];
+
+  const loopLen=5;
+  [0,loopLen,loopLen*2,loopLen*3,loopLen*4,loopLen*5,loopLen*6,loopLen*7,loopLen*8,loopLen*9,loopLen*10,loopLen*11].forEach(offset=>{
+    melody.forEach(([f,t,d])=>{
+      const o=gameAC.createOscillator(),g=gameAC.createGain();
+      o.type='square'; o.frequency.value=f;
+      g.gain.setValueAtTime(0,gameAC.currentTime+offset+t);
+      g.gain.linearRampToValueAtTime(0.12,gameAC.currentTime+offset+t+.01);
+      g.gain.exponentialRampToValueAtTime(0.001,gameAC.currentTime+offset+t+d);
+      o.connect(g);g.connect(master);
+      o.start(gameAC.currentTime+offset+t);
+      o.stop(gameAC.currentTime+offset+t+d+.02);
+      gameNodes.push(o);
+    });
+    bass.forEach(([f,t,d])=>{
+      const o=gameAC.createOscillator(),g=gameAC.createGain();
+      o.type='sawtooth'; o.frequency.value=f;
+      g.gain.setValueAtTime(0,gameAC.currentTime+offset+t);
+      g.gain.linearRampToValueAtTime(0.16,gameAC.currentTime+offset+t+.02);
+      g.gain.exponentialRampToValueAtTime(0.001,gameAC.currentTime+offset+t+d+.1);
+      o.connect(g);g.connect(master);
+      o.start(gameAC.currentTime+offset+t);
+      o.stop(gameAC.currentTime+offset+t+d+.15);
+      gameNodes.push(o);
+    });
+    perc.forEach(t=>{
+      const buf=gameAC.createBuffer(1,gameAC.sampleRate*.05,gameAC.sampleRate);
+      const data=buf.getChannelData(0);
+      for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*(1-i/data.length);
+      const src=gameAC.createBufferSource(), g=gameAC.createGain();
+      src.buffer=buf; g.gain.value=0.09;
+      src.connect(g);g.connect(master);
+      src.start(gameAC.currentTime+offset+t);
+      gameNodes.push(src);
+    });
+  });
+}
+function stopGameMusic() {
+  gameNodes.forEach(n=>{try{n.stop();}catch(e){}});
+  gameNodes=[];
+  if(gameAC){gameAC.close();gameAC=null;}
+}
+
+let currentShopTab = 'weapon';
+
+function switchTab(tab) {
+  currentShopTab = tab;
+  document.getElementById('tab-weapon').classList.toggle('active', tab==='weapon');
+  document.getElementById('tab-skin').classList.toggle('active', tab==='skin');
+  document.getElementById('shop-title-text').textContent = tab==='weapon' ? '🛒 무기 상점' : '🎨 스킨샵';
+  openShop();
+}
+
+// 상점
+function openShop() {
+  document.getElementById('shop-blue-pts').textContent=bluePoints;
+  document.getElementById('shop-red-pts').textContent=redPoints;
+
+  if (currentShopTab === 'weapon') {
+    document.getElementById('blue-equipped').textContent=blueWeapon?blueWeapon.name:'없음';
+    document.getElementById('red-equipped').textContent=redWeapon?redWeapon.name:'없음';
+    ['blue','red'].forEach(team=>{
+      const pts=team==='blue'?bluePoints:redPoints;
+      const eq=team==='blue'?blueWeapon:redWeapon;
+      const cont=document.getElementById(`shop-${team}-items`);
+      cont.innerHTML='';
+      WEAPONS.forEach(w=>{
+        const isEq=eq&&eq.id===w.id, canBuy=pts>=w.price;
+        const div=document.createElement('div');
+        div.className=`shop-item ${team}-item`;
+        div.innerHTML=`<div class="shop-item-row"><div class="shop-item-name">${w.name}</div><div class="shop-item-price">${w.price}P</div></div><div class="shop-item-desc">${w.desc}</div><button class="buy-btn buy-${team}" ${!canBuy||isEq?'disabled':''} data-team="${team}" data-id="${w.id}" data-type="weapon">${isEq?'✅ 장착중':canBuy?'구매':'포인트 부족'}</button>`;
+        cont.appendChild(div);
+      });
+    });
+  } else {
+    document.getElementById('blue-equipped').textContent=blueSkin.emoji+' '+blueSkin.name;
+    document.getElementById('red-equipped').textContent=redSkin.emoji+' '+redSkin.name;
+    ['blue','red'].forEach(team=>{
+      const pts=team==='blue'?bluePoints:redPoints;
+      const owned=team==='blue'?blueOwnedSkins:redOwnedSkins;
+      const curSkin=team==='blue'?blueSkin:redSkin;
+      const cont=document.getElementById(`shop-${team}-items`);
+      cont.innerHTML='';
+      SKINS.forEach(s=>{
+        const isOwned=owned.has(s.id), isEq=curSkin.id===s.id, canBuy=pts>=s.price;
+        const div=document.createElement('div');
+        div.className=`shop-item ${team}-item`;
+        let btnText=isEq?'✅ 착용중':isOwned?'착용하기':canBuy?`${s.price}P 구매`:'포인트 부족';
+        div.innerHTML=`<div class="shop-item-row"><div class="shop-item-name" style="font-size:18px">${s.emoji}</div><div class="shop-item-name">${s.name}</div><div class="shop-item-price">${s.price===0?'무료':s.price+'P'}</div></div><div class="shop-item-desc">${s.desc}</div><button class="buy-btn buy-${team}" ${isEq||(!isOwned&&!canBuy)?'disabled':''} data-team="${team}" data-id="${s.id}" data-type="skin" data-owned="${isOwned}">${btnText}</button>`;
+        cont.appendChild(div);
+      });
+    });
+  }
+  document.getElementById('shop-overlay').style.display='flex';
+}
+function closeShop() { document.getElementById('shop-overlay').style.display='none'; }
+
+document.getElementById('shop-overlay').addEventListener('click', e=>{
+  const btn=e.target.closest('.buy-btn');
+  if(btn&&!btn.disabled){
+    const team=btn.dataset.team, id=btn.dataset.id, type=btn.dataset.type, owned=btn.dataset.owned==='true';
+    if(type==='weapon'){
+      const w=WEAPONS.find(x=>x.id===id); if(!w)return;
+      if(team==='blue'){bluePoints-=w.price;blueWeapon=w;}
+      else{redPoints-=w.price;redWeapon=w;}
+    } else {
+      const s=SKINS.find(x=>x.id===id); if(!s)return;
+      if(owned){
+        if(team==='blue')blueSkin=s; else redSkin=s;
+      } else {
+        if(team==='blue'){if(bluePoints<s.price)return;bluePoints-=s.price;blueOwnedSkins.add(s.id);blueSkin=s;}
+        else{if(redPoints<s.price)return;redPoints-=s.price;redOwnedSkins.add(s.id);redSkin=s;}
+      }
+    }
+    openShop();
+  }
+});
+document.getElementById('shop-close-btn').onclick=closeShop;
+
+// 모드 버튼
+document.querySelectorAll('.mode-btn').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode=btn.dataset.mode;
+  };
+});
+
+// 화면 전환
+function goTitle() {
+  document.getElementById('overlay').style.display='flex';
+  document.getElementById('overlay-result').style.display='none';
+  document.getElementById('team-labels').style.display='flex';
+  document.getElementById('vs-text').style.display='block';
+  document.getElementById('tutorial').style.display='block';
+  document.getElementById('mode-select').style.display='block';
+  document.getElementById('overlay-sub').textContent='두 명이 같은 키보드로 대결하는 2인용 게임';
+  document.getElementById('start-btn').textContent='게임 시작';
+  playTitleMusic();
+}
+
+function startGame() {
+  stopTitleMusic();
+  document.getElementById('overlay').style.display='none';
+  blue=makePlayer(W-120,'#4fc3f7',true);
+  red=makePlayer(80,'#ef5350',false);
+  items=[];particles=[];itemSpawnTimer=0;gameRunning=true;
+  itemScoreBlue=0; itemScoreRed=0;
+  wallLeft=0; wallRight=W;
+
+  if (currentMode==='normal')   timeLeft=300;
+  else if (currentMode==='survival') timeLeft=300;
+  else if (currentMode==='sudden')   timeLeft=9999;
+  else if (currentMode==='item')     timeLeft=120;
+
+  document.getElementById('timer').textContent = currentMode==='sudden' ? '∞' : timeLeft;
+  document.getElementById('round-label').textContent = currentMode==='sudden' ? 'MODE' : 'TIME';
+
+  clearInterval(timerInterval);
+  if (currentMode !== 'sudden') {
+    timerInterval=setInterval(()=>{
+      timeLeft--;
+      document.getElementById('timer').textContent=timeLeft;
+      if(timeLeft<=0){
+        clearInterval(timerInterval);
+        if(currentMode==='item') endGame(itemScoreBlue>itemScoreRed?'BLUE':itemScoreRed>itemScoreBlue?'RED':null);
+        else endGame(blue.hp>=red.hp?'BLUE':red.hp>blue.hp?'RED':null);
+      }
+    },1000);
+  }
+  if(frameId)cancelAnimationFrame(frameId);
+  playGameMusic();
+  gameLoop();
+}
+
+function endGame(w) {
+  gameRunning=false; clearInterval(timerInterval); cancelAnimationFrame(frameId);
+  stopGameMusic();
+  playVictorySound();
+  if(w==='BLUE')bluePoints+=100; else if(w==='RED')redPoints+=100;
+  document.getElementById('team-labels').style.display='none';
+  document.getElementById('vs-text').style.display='none';
+  document.getElementById('tutorial').style.display='none';
+  document.getElementById('mode-select').style.display='none';
+  const result=document.getElementById('overlay-result');
+  result.style.display='block';
+  if(w==='BLUE'){result.style.color='#4fc3f7';result.textContent='🏆 BLUE 승리!';}
+  else if(w==='RED'){result.style.color='#ef5350';result.textContent='🏆 RED 승리!';}
+  else{result.style.color='#fff';result.textContent='🤝 무승부!';}
+  document.getElementById('overlay-sub').innerHTML=`BLUE: ${Math.ceil(blue.hp)}HP &nbsp;|&nbsp; RED: ${Math.ceil(red.hp)}HP<br><span style="color:#4fc3f7">🔵 ${bluePoints}P</span> &nbsp;&nbsp; <span style="color:#ef5350">🔴 ${redPoints}P</span>`;
+  document.getElementById('start-btn').textContent='타이틀로 돌아가기';
+  document.getElementById('overlay').style.display='flex';
+}
+
+// 버튼 이벤트 연결
+document.getElementById('start-btn').onclick=()=>{
+  if(document.getElementById('start-btn').textContent.includes('타이틀'))goTitle();
+  else startGame();
+};
+document.getElementById('shop-title-btn').onclick=openShop;
+document.getElementById('to-title-btn').onclick=()=>{
+  if(!gameRunning){goTitle();return;}
+  if(confirm('타이틀로 돌아가면 게임이 종료돼요. 정말 돌아갈까요?')){
+    gameRunning=false;clearInterval(timerInterval);cancelAnimationFrame(frameId);
+    stopGameMusic();goTitle();
+  }
+};
+
+// 첫 클릭 시 음악 시작
+document.getElementById('overlay').addEventListener('click',function onFirst(){
+  if(!titleAC)playTitleMusic();
+  document.getElementById('overlay').removeEventListener('click',onFirst);
+},{once:true});
+</script>
+</body>
+</html>
